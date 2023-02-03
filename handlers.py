@@ -56,7 +56,11 @@ async def mes_duel(message: types.Message):
         await message.answer(f'Игра уже идет! Нельзя начать новую игру.\n'
                              f'/exit - для выхода из игры!')
     else:
-        duel.append(int(message.from_user.id))
+        if int(message.from_user.id) in duel:
+            await message.answer(f'Противник пока не появился\n'
+                                 f'/exit - для выхода из игры!')
+        else:
+            duel.append(int(message.from_user.id))
         if len(duel) < 2:
             await message.answer(f'Ожидай противника!')
         else:
@@ -80,12 +84,12 @@ async def mes_exit(message: types.Message):
     global current
     global duel
     global new_game
-    if new_game:
+    if len(duel) > 0:
         if int(message.from_user.id) in duel:
-            if len (duel) == 1:
+            if len(duel) == 1:
                 await message.answer(f'Игра прервана. \n/start - для вызова меню')
             else:
-                i,j = 0, 1
+                i, j = 0, 1
                 if duel[1] == int(message.from_user.id):
                     i, j = j, i
                 await dp.bot.send_message(duel[i], 'Игра прервана! \n/start - для вызова меню')
@@ -105,15 +109,18 @@ async def mes_set(message: types.Message):
     global max_count
     global new_game
     name = message.from_user.first_name
-    count = message.text.split()[1]
-    if not new_game:
-        if count.isdigit():
-            max_count = int(count)
-            await message.answer(f'Конфет теперь будет {max_count} ')
+    if len(message.text)>5:
+        count = message.text.split()[1]
+        if not new_game:
+            if count.isdigit() and int(count)> 0:
+                max_count = int(count)
+                await message.answer(f'Конфет теперь будет {max_count} ')
+            else:
+                await message.answer(f'{name}, напишите число больше нуля.')
         else:
-            await message.answer(f'{name}, напишите цифрами')
+            await message.answer(f'{name}, нельзя менять правила во время игры')
     else:
-        await message.answer(f'{name}, нельзя менять правила во время игры')
+        await message.answer(f'{name}, введи команду в формате: \n/set ЧИСЛО.\n Пример: /set 200')
 
 
 @dp.message_handler()
@@ -128,15 +135,18 @@ async def mes_take_candy(message: types.Message):
     if len(duel) == 1:
         if message.from_user.id in duel:
             if message.text.isdigit() and 0 < int(message.text) < 29:
-                total -= int(message.text)
-                if total <= 0:
-                    await message.answer(f'Ура! {name} ты победил!')
-                    new_game = False
-                    duel = []
+                if int(count) <= total:
+                    total -= int(message.text)
+                    if total <= 0:
+                        await message.answer(f'Ура! {name} ты победил!')
+                        new_game = False
+                        duel = []
+                    else:
+                        await message.answer(f'{name} взял {count} конфет. '
+                                             f'На столе осталось {total}')
+                        await bot_turn(message)
                 else:
-                    await message.answer(f'{name} взял {count} конфет. '
-                                         f'На столе осталось {total}')
-                    await bot_turn(message)
+                    await message.answer(f'Можно взять не больше {total} конфет')
             else:
                 await message.answer(f'{name}, надо указать ЧИСЛО от 1 до 28!')
         else:
@@ -147,24 +157,29 @@ async def mes_take_candy(message: types.Message):
             count = message.text
             # if new_game:
             if message.text.isdigit() and 0 < int(message.text) < 29:
-                total -= int(count)
-                if total <= 0:
-                    await message.answer(f'Ура! {name} ты победил!')
-                    await dp.bot.send_message(enemy_id(),
-                                              'К сожалению, ты проиграл! Твой оппонент оказался умнее! :)')
-                    new_game = False
-                    duel = []
+                if int(count) <= total:
+                    total -= int(count)
+                    if total <= 0:
+                        await message.answer(f'Ура! {name} ты победил!')
+                        await dp.bot.send_message(enemy_id(),
+                                                  'К сожалению, ты проиграл! Твой оппонент оказался умнее! :)')
+                        new_game = False
+                        duel = []
+                    else:
+                        await message.answer(f'На столе осталось {total} конфет.\nОжидайте ход противника')
+                        await dp.bot.send_message(enemy_id(),
+                                                  f'Противник взял {count} конфет\n'
+                                                  f'На столе осталось {total} '
+                                                  f'Теперь твой ход! ')
+                        switch_players()
                 else:
-                    await message.answer(f'На столе осталось {total} конфет.\nОжидайте ход противника')
-                    await dp.bot.send_message(enemy_id(),
-                                              f'Противник взял {count} конфет\n'
-                                              f'На столе осталось {total} '
-                                              f'Теперь твой ход! ')
-                    switch_players()
+                    await message.answer(f'Можно взять не больше {total} конфет')
             else:
                 await message.answer(f'{name}, надо указать ЧИСЛО от 1 до 28!')
+        else:
+            await message.answer(f'Cейчас не твой ход!')
     else:
-        await message.answer(f'Некорректный запрос!')
+        await message.answer(f'Некорректный запрос!\n Нажмите /start для запуска.')
 
 
 async def bot_turn(message: types.Message):
